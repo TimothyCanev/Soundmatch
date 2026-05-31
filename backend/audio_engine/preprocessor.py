@@ -56,7 +56,7 @@ async def preprocess(input_path: str) -> dict:
 async def _probe_duration(path: str) -> float:
     """Use ffprobe to get duration without loading the whole file."""
     proc = await asyncio.create_subprocess_exec(
-        r"C:\Users\timus\AppData\Local\Microsoft\WinGet\Links\ffprobe.EXE", "-v", "quiet",
+        "ffprobe", "-v", "quiet",
         "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1",
         path,
@@ -112,7 +112,7 @@ async def _extract_wav(input_path: str, start: float, duration: float) -> str:
     os.close(out_fd)
     
     cmd = [
-        r"C:\Users\timus\AppData\Local\Microsoft\WinGet\Links\ffmpeg.EXE", "-y",
+        "ffmpeg", "-y",
         "-analyzeduration", "100M",
         "-probesize", "100M",
         "-ss", str(start),
