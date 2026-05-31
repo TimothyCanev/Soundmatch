@@ -101,15 +101,13 @@ async def _run_pipeline(file_path: str, settings, url: str = "") -> dict:
     """
     # Step 1: Audio engine (fingerprint + features)
     engine_result = await analyse(file_path, settings)
-    # Extract TikTok author for audio matching fallback
+# Extract TikTok author for audio matching fallback
     if "tiktok.com" in url or "instagram.com" in url:
         try:
-            import httpx
-            r = await httpx.AsyncClient(timeout=10).__aenter__()
-            resp = await r.post("https://www.tikwm.com/api/", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
-            await r.__aexit__(None, None, None)
-            d = resp.json().get("data", {})
-            engine_result.tiktok_author = d.get("music_info", {}).get("author", "") or d.get("author", "")
+            async with httpx.AsyncClient(timeout=10) as r:
+                resp = await r.post("https://www.tikwm.com/api/", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
+                d = resp.json().get("data", {})
+                engine_result.tiktok_author = d.get("music_info", {}).get("author", "") or d.get("author", "")
         except Exception:
             engine_result.tiktok_author = ""
     else:
