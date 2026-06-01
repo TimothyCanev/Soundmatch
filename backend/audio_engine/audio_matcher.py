@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 
 log = structlog.get_logger(__name__)
 
-SIMILARITY_THRESHOLD = 0.78  # minimum chroma similarity to consider a match
+SIMILARITY_THRESHOLD = 0.60  # minimum chroma similarity to consider a match
 BPM_TOLERANCE = 0.12          # 12% BPM tolerance (handles slight speed differences)
 YOUTUBE_SEARCH_API = "https://www.googleapis.com/youtube/v3/search"
 SNIPPET_DURATION = 15         # seconds to download for comparison
