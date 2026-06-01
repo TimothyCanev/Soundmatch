@@ -133,6 +133,10 @@ async def _search_youtube_ytdlp(artist: str, max_results: int) -> list[dict]:
     python_exe = sys.executable
     search_query = f"ytsearch{max_results}:{artist}"
 
+    tmp_dir = tempfile.mkdtemp(prefix="sm_cmp_")
+    output_template = os.path.join(tmp_dir, "cmp.%(ext)s")
+    python_exe = sys.executable
+
     cmd = [
         python_exe, "-m", "yt_dlp",
         "--no-playlist",
