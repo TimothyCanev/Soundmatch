@@ -136,10 +136,11 @@ async def _search_youtube_ytdlp(artist: str, max_results: int) -> list[dict]:
     cmd = [
         python_exe, "-m", "yt_dlp",
         "--no-playlist",
-        "--dump-json",
+        "--max-downloads", "1",
+        "-f", "140/bestaudio/best",
         "--no-warnings",
-        "--flat-playlist",
-        search_query,
+        "-o", output_template,
+        youtube_url,
     ]
 
     proc = await asyncio.create_subprocess_exec(
