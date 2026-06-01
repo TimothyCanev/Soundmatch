@@ -223,8 +223,11 @@ async def _compare_candidate(
             break
 
     if not actual_path:
+        log.warning("snippet_no_file", title=candidate["title"])
         return None
 
+    
+    log.info("snippet_downloaded", title=candidate["title"], path=actual_path)
     try:
         # Extract features from candidate
         y, sr = librosa.load(actual_path, sr=16000, mono=True, duration=SNIPPET_DURATION)
