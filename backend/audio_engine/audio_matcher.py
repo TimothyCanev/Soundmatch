@@ -4,7 +4,7 @@ Audio-to-audio matcher.
 When fingerprinting fails, this module:
 1. Takes the artist name from TikTok metadata
 2. Searches YouTube for that artist
-3. Downloads snippets of top results
+3. Downloads snippets via cobalt.tools API (bypasses server IP blocks)
 4. Compares chroma + BPM against the original clip
 5. Returns matches above a similarity threshold
 """
@@ -168,44 +168,53 @@ async def _compare_candidate(
 
     log.info("comparing_candidate", title=candidate["title"], video_id=video_id)
 
+    # Use cobalt.tools API to download YouTube audio — bypasses server IP blocks
     tmp_dir = tempfile.mkdtemp(prefix="sm_cmp_")
-    output_template = os.path.join(tmp_dir, "cmp.%(ext)s")
-    python_exe = sys.executable
-
-    cmd = [
-        python_exe, "-m", "yt_dlp",
-        "--no-playlist",
-        "--max-downloads", "1",
-        "-f", "140/bestaudio/best",
-        "--no-warnings",
-        "-o", output_template,
-        youtube_url,
-    ]
+    actual_path = os.path.join(tmp_dir, "cmp.mp3")
 
     try:
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(
+                "https://api.cobalt.tools/",
+                json={
+                    "url": youtube_url,
+                    "downloadMode": "audio",
+                    "audioFormat": "mp3",
+                },
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            )
+
+        if resp.status_code != 200:
+            log.warning("cobalt_api_failed", status=resp.status_code, title=candidate["title"])
+            return None
+
+        cobalt_data = resp.json()
+        audio_url = cobalt_data.get("url")
+
+        if not audio_url:
+            log.warning("cobalt_no_url", title=candidate["title"], response=str(cobalt_data)[:200])
+            return None
+
+        # Download the audio file
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            audio_resp = await client.get(audio_url)
+
+        if audio_resp.status_code != 200:
+            log.warning("cobalt_download_failed", status=audio_resp.status_code, title=candidate["title"])
+            return None
+
+        with open(actual_path, "wb") as f:
+            f.write(audio_resp.content)
+
     except Exception as e:
-        log.warning("snippet_download_failed", error=str(e))
+        log.warning("snippet_download_failed", error=str(e), title=candidate["title"])
         return None
 
-    # Find downloaded file
-    actual_path = None
-    AUDIO_EXTS = {".mp3", ".m4a", ".webm", ".ogg", ".opus", ".mp4", ".wav", ".aac"}
-    try:
-        for f in os.listdir(tmp_dir):
-            if not f.endswith(".part") and any(f.endswith(ext) for ext in AUDIO_EXTS):
-                actual_path = os.path.join(tmp_dir, f)
-                break
-    except Exception:
-        pass
-
-    if not actual_path:
-        log.warning("snippet_no_file", title=candidate["title"])
+    if not os.path.exists(actual_path) or os.path.getsize(actual_path) < 5000:
+        log.warning("snippet_too_small", title=candidate["title"])
         return None
 
     log.info("snippet_downloaded", title=candidate["title"], size_kb=os.path.getsize(actual_path) // 1024)
